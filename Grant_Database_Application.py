@@ -213,40 +213,58 @@ def command_5():
         print("Proposal does not exist or has been closed.\n")
         return
     
+    # Command menu for command_5
+    command_5_menu(proposalID)    
+        
+    return
+
+# Command menu for command_5
+def command_5_menu(proposalID):
+    user_input = input("What do you want to do?\n"
+                       "1. Create new assignment\n"
+                       "2. View existing assignments\n"
+                       "3. Add reviewers to existing assignment\n"
+                       "4. Check conflict of intererest for the proposal\n"
+                       "5. Return to command menu\n"
+                       "Enter your selection: ")
+    
+    if user_input == "1":
+        create_assignment(proposalID)
+        command_5_menu(proposalID)
+    elif user_input == "2":
+        view_assignment(proposalID)
+        command_5_menu(proposalID)
+    elif user_input == "3":
+        add_reviewer(proposalID)
+        command_5_menu(proposalID)
+    elif user_input == "4":
+        check_conflict(proposalID)
+        command_5_menu(proposalID)
+    elif user_input == "5":
+        print_command()
+        command_exe()
+        
+    return
+# Check conflict of interest for the proposal
+def check_conflict(proposalID): 
     # Check conflict of interest list for the proposal
-    user_input = input("Do you want to check conflict of interest list? y/n: ")
-    if user_input == "y":
-        sql_query = """
-                        SELECT firstName, lastName, researchers.email
-                        FROM conflictsOfInterest
-                        JOIN researchers 
-                        WHERE proposalID = ?
-                    """
+    sql_query = """
+                    SELECT firstName, lastName, researchers.email
+                    FROM conflictsOfInterest
+                    JOIN researchers 
+                    WHERE proposalID = ?
+                """
     
     cursor.execute(sql_query, (proposalID,))
     results = cursor.fetchall()
     if len(results) < 0:
         print("No conflict of interest found.")
-
-    for row in results:
-        print(f"Name: {row[0]} {row[1]}, Email Address: {row[2]}")
-        
-    # Get user input
-    user_input = input("What do you want to do?\n"
-                       "1. Create new assignment\n"
-                       "2. Add reviewers to existing assignment\n"
-                       "3. Return to command menu\n"
-                       "Enter your selection: ")
-    
-    if user_input == "3":
-        return
-    elif user_input == "1":
-        create_assignment(proposalID)
-    elif user_input == "2":
-        add_reviewer(proposalID)
-        
+    else: 
+        print("Conflict of interest list: ")
+        for row in results:
+            print(f"Name: {row[0]} {row[1]}, Email Address: {row[2]}")
     return
-    
+
 # Create a new review assignment 
 def create_assignment(proposalID):
     # Generate a new assignment ID
@@ -263,7 +281,7 @@ def create_assignment(proposalID):
     
     # Commit the changes
     conn.commit()
-    print("Assignment created successfully.\n")
+    print(f"Assignment created successfully with new assignmentID is: {assignmentID}.\n")
     
     # Asking for adding reviewers
     user_input = input("Do you want to add reviewers to the assignment? y/n: ")
@@ -272,63 +290,86 @@ def create_assignment(proposalID):
         
     else: return
     
-
+# Asking for viewing existing assignments
+def view_assignment(proposalID):
+    sql_query = """
+        SELECT assignmentID
+        FROM reviewAssignment
+        WHERE proposalID = ?
+        """
+    cursor.execute(sql_query, (proposalID,))
+    results = cursor.fetchall()
+    if len(results) == 0:
+        print("No existing assignment found.\n")
+        user_input = input("Do you want to create a new assignment? y/n: ")
+        if user_input == "y":
+            create_assignment(proposalID)
+        else: return
+    else: 
+        for row in results:
+            print(f"Assignment ID: {row[0]}")
+    return
+        
+        
 # Add new reviewers to existing review assignment   
 def add_reviewer(proposalID):
     # Get user input
     email = input("Enter the email address of the reviewer, seperated by comma: ")
     email_list = [item.strip() for item in email.split(',')]
     
-    # Check if the reviewer exists
-    for email in email_list:
+    # Check if the reviewer exists and add to the proposal
+    exist_email = cursor.execute("SELECT email FROM researchers").fetchall()[0]
+    for each_email in email_list:
         sql_query = """
-            SELECT *
+            SELECT email
             FROM researchers
             WHERE email = ?
             """
-        cursor.execute(sql_query, (email,))
+        cursor.execute(sql_query, (each_email,))
         results = cursor.fetchall()
         if len(results) == 0:
-            print("Reviewer does not exist.")
+            print(f"Reviewer {each_email} does not exist.\n")
             continue
-        else: 
-            
+
+        # Check if the reviewer has a conflict of interest with the proposal
+        sql_query = """
+            SELECT *
+            FROM conflictsOfInterest
+            WHERE email = ? AND proposalID = ?
+            """
+        cursor.execute(sql_query, (each_email, proposalID))
+        results = cursor.fetchall()
+        if len(results) > 0:
+            print(f"Reviewer {each_email} has a conflict of interest with the proposal.\n")
+            continue
     
-    # Check if the reviewer has a conflict of interest with the proposal
-    sql_query = """
-        SELECT *
-        FROM conflictsOfInterest
-        WHERE email = ? AND proposalID = ?
-        """
-    cursor.execute(sql_query, (email, proposalID))
-    results = cursor.fetchall()
-    if len(results) > 0:
-        print("Reviewer has a conflict of interest with the proposal.")
-        return
+        # Check if the reviewer has been assigned to the proposal
+        sql_query = """
+            SELECT *
+            FROM reviewing
+            JOIN proposal
+            WHERE email = ? AND proposalID = ?
+            """
+        cursor.execute(sql_query, (each_email, proposalID))
+        if len(results) > 0:
+            print(f"Reviewer {each_email} has already been assigned to the proposal.\n")
+            continue
     
-    # Check if the reviewer has been assigned to the proposal
-    sql_query = """
-        SELECT *
-        FROM reviewing
-        WHERE email = ? AND proposalID = ?
-        """
-    cursor.execute(sql_query, (email, proposalID))
-    results = cursor.fetchall()
-    if len(results) > 0:
-        print("Reviewer has already been assigned to the proposal.")
-        return
+        # Add the reviewer to the assginment
+        assignmentID_list = cursor.execute("SELECT reviewAssignment.assignmentID FROM reviewing JOIN reviewAssignment WHERE proposalID = ?", (proposalID,)).fetchall()[0]
+        
+        for each_assignmentID in assignmentID_list:
+            sql_query = """
+                INSERT INTO reviewing (email, assignmentID)
+                VALUES (?, ?)
+                """
+            cursor.execute(sql_query, (each_email, each_assignmentID))
+
     
-    # Add the reviewer to the proposal
-    sql_query = """
-        INSERT INTO reviewing (email, proposalID)
-        VALUES (?, ?)
-        """
-    cursor.execute(sql_query, (email, proposalID))
+        # Commit the changes
+        conn.commit()
     
-    # Commit the changes
-    conn.commit()
-    
-    print("Reviewer added successfully.")
+        print("Reviewer added successfully.")
 def command_6():    
     # Get user input
     name = input("Enter your first and last name: ")
