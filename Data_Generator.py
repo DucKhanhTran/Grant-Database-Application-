@@ -38,6 +38,7 @@ def data_generator(databaseName):
         competitionStatus = random.choice(['Open', 'Closed'])
         # Generate random area from a list of 20 areas
         area = fake.random_element(elements=['Agriculture', 'Arts', 'Biotechnology', 'Business', 'Chemistry', 'Computer Science', 'Economics', 'Education', 'Engineering', 'Environment', 'Geology', 'Health', 'History', 'Humanities', 'Law', 'Mathematics', 'Physics', 'Psychology', 'Sociology', 'Statistics'])
+        title = ''
         # Generate random title based on the area
         if area == 'Agriculture':
             title = fake.random_element(elements=['Agricultural Research', 'Crop Production', 'Soil Science', 'Plant Breeding', 'Agricultural Economics'])
@@ -186,18 +187,12 @@ def data_generator(databaseName):
         }
 
         # Generate a description for each title based on the predefined descriptions
-        title_descriptions_generated = {}
-
-        for title, description in title_descriptions.items():
-            if title not in title_descriptions_generated:
-                title_descriptions_generated[title] = description
-            else:
-                print(f"Description already exists for title: {title}")
+        description = title_descriptions.get(title, 'No description available')
 
 
         # Execute SQL query to insert data into the competition table
         cursor.execute("INSERT OR IGNORE INTO competition (title, applicationDeadline, competitionStatus, area, description, openDate, closeDate) VALUES (?, ?, ?, ?, ?, ?, ?)", 
-                       (title, applicationDeadline, competitionStatus, area, title_descriptions_generated[title], openDate, closeDate))
+                       (title, applicationDeadline, competitionStatus, area, description, openDate, closeDate))
 
     # Generate proposals
     for _ in range(70):

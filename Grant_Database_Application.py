@@ -177,11 +177,9 @@ def command_4():
     
     # Define the query
     sql_query = """
-        SELECT AVG(ABS(requestedAmount - awardAmount))
+        SELECT AVG(ABS(proposal.requestedAmount-awardAmount))
         FROM proposal
-        JOIN competition
-        WHERE area COLLATE NOCASE = ?
-        GROUP BY area
+        WHERE competitionID IN (SELECT competitionID FROM competition WHERE area COLLATE NOCASE = ?)
         """
         
     # Execute the query
