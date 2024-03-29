@@ -1,4 +1,5 @@
 import sqlite3
+from faker import Faker
 
 
 # Connect to the database
@@ -231,25 +232,98 @@ def command_5():
         print(f"Name: {row[0]} {row[1]}, Email Address: {row[2]}")
         
     # Get user input
-    user_input = input("Would you like to add a reviewer? y/n")
+    user_input = input("What do you want to do?\n"
+                       "1. Create new assignment\n"
+                       "2. Add reviewers to existing assignment\n"
+                       "3. Return to command menu\n"
+                       "Enter your selection: ")
     
-    if user_input == "n":
+    if user_input == "3":
         return
-    else:
-        email_input = input("Enter the reviewers email, seperated by comma: ")
+    elif user_input == "1":
+        create_assignment(proposalID)
+    elif user_input == "2":
+        add_reviewer(proposalID)
+        
+    return
     
-    # Split the emails
-    email_list = [item.strip() for item in email_input.split(',')]
+# Create a new review assignment 
+def create_assignment(proposalID):
+    # Generate a new assignment ID
+    cursor.execute("SELECT MAX(assignmentID) FROM reviewAssignment ")
+    assignmentID = cursor.fetchone()[0]
+    assignmentID = 0 if assignmentID is None else assignmentID + 1
     
-    # Define the query
+    # Create a new review assignment
     sql_query = """
-        INSERT INTO reviewing (proposalID, email)
+        INSERT INTO reviewAssignment (assignmentID, proposalID)
         VALUES (?, ?)
         """
+    cursor.execute(sql_query, (assignmentID, proposalID))
+    
+    # Commit the changes
+    conn.commit()
+    print("Assignment created successfully.\n")
+    
+    # Asking for adding reviewers
+    user_input = input("Do you want to add reviewers to the assignment? y/n: ")
+    if user_input == "y":
+        add_reviewer(proposalID)
         
-    # Execute the query
-    for item in email_list:
-        cursor.execute(sql_query, (proposalID, item))
+    else: return
+    
+
+# Add new reviewers to existing review assignment   
+def add_reviewer(proposalID):
+    # Get user input
+    email = input("Enter the email address of the reviewer, seperated by comma: ")
+    email_list = [item.strip() for item in email.split(',')]
+    
+    # Check if the reviewer exists
+    for email in email_list:
+        sql_query = """
+            SELECT *
+            FROM researchers
+            WHERE email = ?
+            """
+        cursor.execute(sql_query, (email,))
+        results = cursor.fetchall()
+        if len(results) == 0:
+            print("Reviewer does not exist.")
+            continue
+        else: 
+            
+    
+    # Check if the reviewer has a conflict of interest with the proposal
+    sql_query = """
+        SELECT *
+        FROM conflictsOfInterest
+        WHERE email = ? AND proposalID = ?
+        """
+    cursor.execute(sql_query, (email, proposalID))
+    results = cursor.fetchall()
+    if len(results) > 0:
+        print("Reviewer has a conflict of interest with the proposal.")
+        return
+    
+    # Check if the reviewer has been assigned to the proposal
+    sql_query = """
+        SELECT *
+        FROM reviewing
+        WHERE email = ? AND proposalID = ?
+        """
+    cursor.execute(sql_query, (email, proposalID))
+    results = cursor.fetchall()
+    if len(results) > 0:
+        print("Reviewer has already been assigned to the proposal.")
+        return
+    
+    # Add the reviewer to the proposal
+    sql_query = """
+        INSERT INTO reviewing (email, proposalID)
+        VALUES (?, ?)
+        """
+    cursor.execute(sql_query, (email, proposalID))
     
     # Commit the changes
     conn.commit()
