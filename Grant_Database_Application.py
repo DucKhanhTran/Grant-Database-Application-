@@ -1,7 +1,8 @@
 import sqlite3
+from faker import Faker
 
 # Connect to the database
-conn = sqlite3.connect('grantdatabase.db')
+conn = sqlite3.connect('grant.db')
 
 # Create a cursor object to interact with the database
 cursor = conn.cursor()
@@ -58,9 +59,10 @@ def command_exe():
     else:
         print("Invalid command, please try again\n")
         print_command()
-    user_input= input("Would you like to perform another command? y/n")
+    user_input= input("Would you like to perform another command? y/n ")
     if user_input == "y":
         print_command()
+        command_exe()
     else:
         print("Goodbye!")
         conn.close()
@@ -75,21 +77,21 @@ def command_0():
 
 def command_1():
     # Get user input
-    month = input("Enter the month: ")
+    month = input("Enter the month %mm: ")
     
-    # Define the query
+    # Define the query to find the competition with at least one submitted significant proposal with requested amount > 20000 or competition with at least 20 researchers at a specific month
+    
     sql_query = """
-        SELECT DISTINCT competitionID, DISTINCT title 
-        FROM grant_competition 
-        JOIN grant_proposal ON competitionID 
-        WHERE month = ? AND (requestedAmount > 20000 or competitionID IN (
-            SELECT competitionID 
-            FROM grant_proposal 
-            JOIN researching ON proposalID
-            GROUP BY proposalID
-            HAVING COUNT(email)>20))
-        ORDER BY competitionID
-        """
+        SELECT DISTINCT competition.competitionID, competition.title
+        FROM competition
+        JOIN proposal 
+        WHERE (requestedAmount > 20000 OR (
+            SELECT COUNT(email)
+            FROM researching
+            WHERE proposalID = proposal.proposalID) >= 10)
+        AND strftime('%m', competition.openDate) = ?
+        ORDER BY competition.competitionID
+    """        
     # Execute the query
     cursor.execute(sql_query, (month,))
     
@@ -100,9 +102,11 @@ def command_1():
     if len(results) == 0:
         print("No results found.")    
         
-    # Print the results
+    # Print the results without the brackets
     for row in results:
-        print(row)    
+        print(f"Competition ID: {row[0]}, Competition Title: {row[0]}")
+        
+    
         
 def command_2():
     # Get user input
@@ -110,10 +114,10 @@ def command_2():
     
     # Define the query
     sql_query = """
-        SELECT proposalID, title, requestedAmount
-        FROM grant_proposal
-        JOIN grant_competition ON competitionID
-        WHERE area = ?
+        SELECT proposalID, requestedAmount
+        FROM proposal 
+        JOIN competition ON competition.competitionID = proposal.competitionID
+        WHERE area COLLATE NOCASE = ?
         ORDER BY requestedAmount DESC
         LIMIT 1
         """
@@ -130,19 +134,19 @@ def command_2():
         
     # Print the results
     for row in results: 
-        print(row)
+        print(f"Proposal ID: {row[0]}, Requested Amount: {row[1]}")
         
 def command_3():
     # Get user input
-    date = input("Enter the date: ")
+    date = input("Enter the date in format YYYY-MM-DD: ")
     
     # Define the query
     sql_query = """
-        SELECT proposalID, title, awardedAmount
-        FROM grant_proposal
-        JOIN grant_competition ON competitionID
-        WHERE submissionDate < ?
-        ORDER BY awardedAmount DESC
+        SELECT proposalID, awardAmount
+        FROM proposal
+        JOIN competition
+        WHERE strftime('%Y-%m-%d' ,submissionDate) < strftime('%Y-%m-%d', ?)
+        ORDER BY awardAmount DESC
         LIMIT 1
         """
         
@@ -158,7 +162,7 @@ def command_3():
         
     # Print the results
     for row in results:
-        print(row)
+        print(f"Proposal ID: {row[0]}, Award Amount: {row[1]}")
     
 def command_4():
     # Get user input
@@ -166,10 +170,11 @@ def command_4():
     
     # Define the query
     sql_query = """
-        SELECT AVG(requestedAmount - awardedAmount)
-        FROM grant_proposal
-        JOIN grant_competition ON competitionID
-        WHERE area = ?
+        SELECT AVG(ABS(requestedAmount - awardAmount))
+        FROM proposal
+        JOIN competition
+        WHERE area COLLATE NOCASE = ?
+        GROUP BY area
         """
         
     # Execute the query
@@ -184,7 +189,7 @@ def command_4():
     
     # Print the results
     for row in results:
-        print(row)
+        print(f"Average Requested/Awarded Discrepancy: {row[0]}")
         
 def command_5():
     # Declare global variables
@@ -196,24 +201,24 @@ def command_5():
     # Check if the proposal exists and open for review
     sql_query =     """
                     SELECT *
-                    FROM grantProposal
+                    FROM proposal
                     WHERE proposalID = ? 
-                    AND proposalStatus = TRUE
+                    AND applicationStatus = 'Pending'
                     """
                     
     cursor.execute(sql_query, (proposalID,))
     results = cursor.fetchall()
-    if len(results) == 0: print("Proposal does not exist or has been closed.\n")
-    
-    print_command()
+    if len(results) == 0: 
+        print("Proposal does not exist or has been closed.\n")
+        return
     
     # Check conflict of interest list for the proposal
-    user_input = input("Do you want to check conflict of interest list? y/n")
+    user_input = input("Do you want to check conflict of interest list? y/n: ")
     if user_input == "y":
         sql_query = """
-                        SELECT firstName, lastName, email
-                        FROM conflict_of_interest
-                        JOIN researcher ON email
+                        SELECT firstName, lastName, researchers.email
+                        FROM conflictsOfInterest
+                        JOIN researchers 
                         WHERE proposalID = ?
                     """
     
@@ -223,28 +228,101 @@ def command_5():
         print("No conflict of interest found.")
 
     for row in results:
-        print(row)
+        print(f"Name: {row[0]} {row[1]}, Email Address: {row[2]}")
         
     # Get user input
-    user_input = input("Would you like to add a reviewer? y/n")
+    user_input = input("What do you want to do?\n"
+                       "1. Create new assignment\n"
+                       "2. Add reviewers to existing assignment\n"
+                       "3. Return to command menu\n"
+                       "Enter your selection: ")
     
-    if user_input == "n":
+    if user_input == "3":
         return
+    elif user_input == "1":
+        create_assignment(proposalID)
+    elif user_input == "2":
+        add_reviewer(proposalID)
+        
+    return
     
-    email = input("Enter the reviewers email, seperate by comma: ")
+# Create a new review assignment 
+def create_assignment(proposalID):
+    # Generate a new assignment ID
+    cursor.execute("SELECT MAX(assignmentID) FROM reviewAssignment ")
+    assignmentID = cursor.fetchone()[0]
+    assignmentID = 0 if assignmentID is None else assignmentID + 1
     
-    # Split the emails
-    email_list = [item.strip() for item in email.split(',')]
-    
-    # Define the query
+    # Create a new review assignment
     sql_query = """
-        INSERT INTO reviewing (proposalID, email)
+        INSERT INTO reviewAssignment (assignmentID, proposalID)
         VALUES (?, ?)
         """
+    cursor.execute(sql_query, (assignmentID, proposalID))
+    
+    # Commit the changes
+    conn.commit()
+    print("Assignment created successfully.\n")
+    
+    # Asking for adding reviewers
+    user_input = input("Do you want to add reviewers to the assignment? y/n: ")
+    if user_input == "y":
+        add_reviewer(proposalID)
         
-    # Execute the query
-    for item in email_list:
-        cursor.execute(sql_query, (proposalID, email))
+    else: return
+    
+
+# Add new reviewers to existing review assignment   
+def add_reviewer(proposalID):
+    # Get user input
+    email = input("Enter the email address of the reviewer, seperated by comma: ")
+    email_list = [item.strip() for item in email.split(',')]
+    
+    # Check if the reviewer exists
+    for email in email_list:
+        sql_query = """
+            SELECT *
+            FROM researchers
+            WHERE email = ?
+            """
+        cursor.execute(sql_query, (email,))
+        results = cursor.fetchall()
+        if len(results) == 0:
+            print("Reviewer does not exist.")
+            continue
+        else: 
+            
+    
+    # Check if the reviewer has a conflict of interest with the proposal
+    sql_query = """
+        SELECT *
+        FROM conflictsOfInterest
+        WHERE email = ? AND proposalID = ?
+        """
+    cursor.execute(sql_query, (email, proposalID))
+    results = cursor.fetchall()
+    if len(results) > 0:
+        print("Reviewer has a conflict of interest with the proposal.")
+        return
+    
+    # Check if the reviewer has been assigned to the proposal
+    sql_query = """
+        SELECT *
+        FROM reviewing
+        WHERE email = ? AND proposalID = ?
+        """
+    cursor.execute(sql_query, (email, proposalID))
+    results = cursor.fetchall()
+    if len(results) > 0:
+        print("Reviewer has already been assigned to the proposal.")
+        return
+    
+    # Add the reviewer to the proposal
+    sql_query = """
+        INSERT INTO reviewing (email, proposalID)
+        VALUES (?, ?)
+        """
+    cursor.execute(sql_query, (email, proposalID))
     
     # Commit the changes
     conn.commit()
@@ -258,8 +336,8 @@ def command_6():
     # Define the query
     sql_query = """
         SELECT proposalID, title, area, requestedAmount
-        FROM grant_proposal
-        JOIN grant_competition ON competitionID
+        FROM proposal
+        JOIN competition ON competitionID
         WHERE proposalID NOT IN (
             SELECT proposalID
             FROM reviewing
@@ -282,6 +360,8 @@ def command_6():
     # Print the results
     for row in results:
         print(row)    
+        
+     
 # Main program
 print_command()
 command_exe()
