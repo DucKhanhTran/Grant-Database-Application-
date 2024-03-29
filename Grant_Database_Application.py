@@ -1,6 +1,7 @@
 import sqlite3
 from faker import Faker
 
+
 # Connect to the database
 conn = sqlite3.connect('grant.db')
 
