@@ -1,8 +1,6 @@
 import sqlite3
 from faker import Faker
 
-# Global variables
-user_input = None
 
 # Connect to the database
 conn = sqlite3.connect('grant.db')
@@ -35,6 +33,12 @@ def print_command():
     value_to_check = {0,1,2,3,4,5,6}
     
     user_input = input("Enter your command number: ")
+    try: 
+        int(user_input)
+    except ValueError:
+        print("Invalid command, please try again\n")
+        print_command()
+
     if int(user_input) not in value_to_check:
         print("Invalid command, please try again\n")
         print_command()
@@ -315,10 +319,18 @@ def view_assignment(proposalID):
         
 # Add new reviewers to existing review assignment   
 def add_reviewer(proposalID):
+    # Declare variables
+    email_list = []
     # Get user input
     email = input("Enter the email address of the reviewer, seperated by comma: ")
-    email_list = [item.strip() for item in email.split(',')]
     
+    # Validate the input
+    try: 
+        email_list = [item.strip() for item in email.split(',')]
+    except ValueError:
+        print("Invalid email address, please try again.\n")
+        add_reviewer(proposalID)
+        return
     # Check if the reviewer exists and add to the proposal
     exist_email = cursor.execute("SELECT email FROM researchers").fetchall()[0]
     for each_email in email_list:
@@ -373,22 +385,27 @@ def add_reviewer(proposalID):
     
         print("Reviewer added successfully.")
 def command_6():    
+    # Declare variables
+    first_name = ""
+    last_name = ""
     # Get user input
     name = input("Enter your first and last name: ")
-    first_name, last_name = name.split()
+    try:
+        first_name, last_name = name.split()
+    except ValueError:
+        print("Invalid name, please try again.\n")
+        command_6()
+        return
     
     # Define the query
     sql_query = """
-        SELECT proposalID, title, area, requestedAmount
-        FROM proposal
-        JOIN competition ON competitionID
-        WHERE proposalID NOT IN (
-            SELECT proposalID
-            FROM reviewing
-            WHERE email = (
-                SELECT email
-                FROM researcher
-                WHERE firstName = ? AND lastName = ?))
+        SELECT title, reviewAssignment.proposalID, assignmentDeadline
+        FROM reviewAssignment
+        JOIN reviewing
+        JOIN researchers
+        JOIN proposal ON proposal.proposalID = reviewAssignment.proposalID
+        JOIN competition ON competition.competitionID = proposal.competitionID
+        WHERE firstName = ? AND lastName = ? AND submissionStatus = "Not Submitted" AND competitionStatus = "Open"  
         """
     
     # Execute the query
