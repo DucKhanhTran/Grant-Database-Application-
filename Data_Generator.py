@@ -5,12 +5,15 @@ from datetime import datetime, timedelta
 
 fake = Faker()
 
+# Define a base value
+base = 100;
+
 def data_generator(databaseName):
     conn = sqlite3.connect(databaseName)
     cursor = conn.cursor()
 
     # Generate researchers
-    for _ in range(50):
+    for _ in range(50*base):
         email = fake.email()
         firstName = fake.first_name()
         lastName = fake.last_name()
@@ -20,7 +23,7 @@ def data_generator(databaseName):
 
 
     # Generate competitions
-    for _ in range(20):
+    for _ in range(base):
          # Generate random openDate
         today = datetime.now()
         start_date = today - timedelta(days=365 * 20)  # 20 years ago
@@ -195,7 +198,7 @@ def data_generator(databaseName):
                        (title, applicationDeadline, competitionStatus, area, description, openDate, closeDate))
 
     # Generate proposals
-    for _ in range(70):
+    for _ in range(10*base):
         proposalID = fake.unique.random_number()
         competitionID = fake.random_element(elements=[c[0] for c in cursor.execute("SELECT competitionID FROM competition").fetchall()])
         applicationStatus = random.choice(['Pending', 'Accepted', 'Rejected'])
@@ -220,7 +223,7 @@ def data_generator(databaseName):
 
 
     # Generate researching
-    for _ in range(120):
+    for _ in range(20*base):
         email = fake.random_element(elements=[r[0] for r in cursor.execute("SELECT email FROM researchers").fetchall()])
         proposalID = fake.random_element(elements=[p[0] for p in cursor.execute("SELECT proposalID FROM proposal").fetchall()])
         
@@ -234,7 +237,7 @@ def data_generator(databaseName):
 
     
     # Generate reviewAssignment
-    for _ in range(100):
+    for _ in range(25*base):
         assignmentID = fake.unique.random_number()
         proposalID = fake.random_element(elements=[p[0] for p in cursor.execute("SELECT proposalID FROM proposal").fetchall()])
         
@@ -259,7 +262,7 @@ def data_generator(databaseName):
         cursor.execute("INSERT OR IGNORE INTO reviewAssignment (assignmentID, proposalID, assignmentDeadline) VALUES (?, ?, ?)", (assignmentID, proposalID, assignmentDeadline))
 
     # Generate Reviewing
-    for _ in range(100):
+    for _ in range(30*base):
         assignmentID = fake.random_element(elements=[a[0] for a in cursor.execute("SELECT assignmentID FROM reviewAssignment").fetchall()])
         proposalID = cursor.execute("SELECT proposalID FROM reviewAssignment WHERE assignmentID = ?", (assignmentID,)).fetchone()[0]
         email = fake.random_element(elements=[r[0] for r in cursor.execute("SELECT email FROM researchers WHERE email NOT IN (SELECT email FROM researching WHERE proposalID = ?)", (proposalID,)).fetchall()])
@@ -269,14 +272,14 @@ def data_generator(databaseName):
 
 
     # Generate conflictsOfInterest
-    for _ in range(30):
+    for _ in range(10*base):
         email = fake.random_element(elements=[r[0] for r in cursor.execute("SELECT email FROM researchers").fetchall()])
         proposalID = fake.random_element(elements=[p[0] for p in cursor.execute("SELECT proposalID FROM proposal").fetchall()])
         cursor.execute("INSERT OR IGNORE INTO conflictsOfInterest (email, proposalID) VALUES (?, ?)", (email, proposalID))
 
 
     # Generate committeesMeeting
-    for _ in range(10):
+    for _ in range(5*base):
         
         # Generate random meetingDate
         today = datetime.now()
@@ -290,7 +293,7 @@ def data_generator(databaseName):
 
 
     # Generate discussion
-    for _ in range(30):
+    for _ in range(25*base):
         meetingID = fake.random_element(elements=[m[0] for m in cursor.execute("SELECT meetingID FROM committeesMeeting").fetchall()])
         
         # Fetch competitionID from competition table where openDate is before meetingDate and closeDate is after meetingDate
