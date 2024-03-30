@@ -413,7 +413,7 @@ def command_6():
     
     # Define the query
     sql_query = """
-        SELECT title, reviewAssignment.proposalID, assignmentDeadline
+        SELECT DISTINCT title, reviewAssignment.proposalID, assignmentDeadline
         FROM reviewAssignment
         JOIN reviewing ON reviewAssignment.assignmentID = reviewing.assignmentID
         JOIN researchers ON researchers.email = reviewing.email
@@ -431,10 +431,11 @@ def command_6():
     # Exception handling
     if len(results) == 0:
         print("No results found.")
-        
-    # Print the results
-    for row in results:
-        print(row)    
+    else:    
+        # Print the results
+        for row in results:
+            print(row)    
+    return
         
      
 # Main program
