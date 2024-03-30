@@ -212,14 +212,9 @@ def data_generator(databaseName):
             awardAmount = random.uniform(1000, requestedAmount)
             cursor.execute("INSERT OR IGNORE INTO proposal (proposalID, competitionID, submissionDate, applicationStatus, requestedAmount, awardDate, awardAmount) VALUES (?, ?, ?, ?, ?, ?, ?)", (proposalID, competitionID, submissionDate, applicationStatus, requestedAmount, awardDate, awardAmount))
         elif applicationStatus == 'Rejected': 
-            awardDate = None
-            awardAmount = None
             rejectDate = fake.date_between(start_date=datetime.strptime(submissionDate, '%Y-%m-%d'), end_date=datetime.strptime(closeDate, '%Y-%m-%d')).strftime('%Y-%m-%d')
             cursor.execute("INSERT OR IGNORE INTO proposal (proposalID, competitionID, submissionDate, applicationStatus, requestedAmount, rejectDate) VALUES (?, ?, ?, ?, ?, ?)", (proposalID, competitionID, submissionDate, applicationStatus, requestedAmount, rejectDate))
         else:
-            awardDate = None
-            awardAmount = None
-            rejectDate = None
             cursor.execute("INSERT OR IGNORE INTO proposal (proposalID, competitionID, submissionDate, applicationStatus, requestedAmount) VALUES (?, ?, ?, ?, ?)", (proposalID, competitionID, submissionDate, applicationStatus, requestedAmount))
         
 

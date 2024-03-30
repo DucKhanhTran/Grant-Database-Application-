@@ -111,7 +111,7 @@ def command_1():
         
     # Print the results without the brackets
     for row in results:
-        print(f"Competition ID: {row[0]}, Competition Title: {row[0]}")
+        print(f"Competition ID: {row[0]}, Competition Title: {row[1]}")
         
     
         
