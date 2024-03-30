@@ -173,19 +173,12 @@ def database_create(databaseName):
     
     print("Database created successfully.")
 
-def print_competition():
-    conn = sqlite3.connect("grant.db")
-    cursor = conn.cursor()
+
     
-    cursor.execute("SELECT competition.*, COUNT(DISTINCT proposal.proposalID) as proposal_count FROM competition JOIN proposal ON competition.competitionID = proposal.competitionID GROUP BY competition.competitionID")
-    rows = cursor.fetchall()
-    for row in rows:
-        print(row)
-    
-database_drop("grant.db")
-database_create("grant.db")
-Data_Generator.data_generator("grant.db")
-print_competition()
+database_drop("council.db")
+database_create("council.db")
+Data_Generator.data_generator("council.db")
+
 
 
 

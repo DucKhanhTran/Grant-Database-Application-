@@ -13,7 +13,7 @@ def data_generator(databaseName):
     cursor = conn.cursor()
 
     # Generate researchers
-    for _ in range(50*base):
+    for _ in range(200*base):
         email = fake.email()
         firstName = fake.first_name()
         lastName = fake.last_name()
@@ -223,8 +223,9 @@ def data_generator(databaseName):
 
 
     # Generate researching
-    for _ in range(20*base):
-        email = fake.random_element(elements=[r[0] for r in cursor.execute("SELECT email FROM researchers").fetchall()])
+    researchers_list = cursor.execute("SELECT email FROM researchers").fetchmany(180*base)      
+    for each_researcher in researchers_list:
+        email = each_researcher[0]
         proposalID = fake.random_element(elements=[p[0] for p in cursor.execute("SELECT proposalID FROM proposal").fetchall()])
         
         if cursor.execute("SELECT COUNT(principal) FROM researching WHERE proposalID = ? AND principal = 1", (proposalID,)).fetchone()[0] == 0:
@@ -257,12 +258,12 @@ def data_generator(databaseName):
         elif applicationStatus == 'Rejected':
             assignmentDeadline = fake.date_between(start_date=datetime.strptime(submissionDate, '%Y-%m-%d'), end_date=datetime.strptime(rejectDate, '%Y-%m-%d')).strftime('%Y-%m-%d')
         else:
-            assignmentDeadline = fake.date_between(start_date=datetime.strptime(submissionDate, '%Y-%m-%d'), end_date=datetime.strptime(closeDate, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
+            assignmentDeadline = fake.date_between(start_date=datetime.strptime(submissionDate, '%Y-%m-%d'), end_date=datetime.strptime(closeDate, '%Y-%m-%d')).strftime('%Y-%m-%d')
 
         cursor.execute("INSERT OR IGNORE INTO reviewAssignment (assignmentID, proposalID, assignmentDeadline) VALUES (?, ?, ?)", (assignmentID, proposalID, assignmentDeadline))
 
     # Generate Reviewing
-    for _ in range(30*base):
+    for _ in range(50*base):
         assignmentID = fake.random_element(elements=[a[0] for a in cursor.execute("SELECT assignmentID FROM reviewAssignment").fetchall()])
         proposalID = cursor.execute("SELECT proposalID FROM reviewAssignment WHERE assignmentID = ?", (assignmentID,)).fetchone()[0]
         email = fake.random_element(elements=[r[0] for r in cursor.execute("SELECT email FROM researchers WHERE email NOT IN (SELECT email FROM researching WHERE proposalID = ?)", (proposalID,)).fetchall()])

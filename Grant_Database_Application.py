@@ -3,7 +3,7 @@ from faker import Faker
 
 
 # Connect to the database
-conn = sqlite3.connect('grant.db')
+conn = sqlite3.connect('council.db')
 
 # Create a cursor object to interact with the database
 cursor = conn.cursor()
@@ -95,7 +95,8 @@ def command_1():
         WHERE (requestedAmount > 20000 OR (
             SELECT COUNT(email)
             FROM researching
-            WHERE proposalID = proposal.proposalID) >= 10)
+            WHERE proposalID = proposal.proposalID
+            GROUP BY proposalID) >= 10)
         AND strftime('%m', competition.openDate) = ?
         ORDER BY competition.competitionID
     """        
@@ -343,8 +344,9 @@ def add_reviewer(proposalID):
         add_reviewer(proposalID)
         return
     # Check if the reviewer exists and add to the proposal
-    exist_email = cursor.execute("SELECT email FROM researchers").fetchall()[0]
+    exist_email = cursor.execute("SELECT email FROM researchers").fetchall()
     for each_email in email_list:
+        email = each_email[0]
         sql_query = """
             SELECT email
             FROM researchers
@@ -353,7 +355,7 @@ def add_reviewer(proposalID):
         cursor.execute(sql_query, (each_email,))
         results = cursor.fetchall()
         if len(results) == 0:
-            print(f"Reviewer {each_email} does not exist.\n")
+            print(f"Reviewer {email} does not exist.\n")
             continue
 
         # Check if the reviewer has a conflict of interest with the proposal
@@ -381,14 +383,15 @@ def add_reviewer(proposalID):
             continue
     
         # Add the reviewer to the assginment
-        assignmentID_list = cursor.execute("SELECT reviewAssignment.assignmentID FROM reviewing JOIN reviewAssignment ON reviewAssignment.assignmentID = reviewing.assignmentID WHERE proposalID = ?", (proposalID,)).fetchall()[0]
+        assignmentID_list = cursor.execute("SELECT reviewAssignment.assignmentID FROM reviewing JOIN reviewAssignment ON reviewAssignment.assignmentID = reviewing.assignmentID WHERE proposalID = ?", (proposalID,)).fetchall()
         
         for each_assignmentID in assignmentID_list:
+            assignmentID = each_assignmentID[0]
             sql_query = """
                 INSERT INTO reviewing (email, assignmentID)
                 VALUES (?, ?)
                 """
-            cursor.execute(sql_query, (each_email, each_assignmentID))
+            cursor.execute(sql_query, (each_email, assignmentID))
 
     
         # Commit the changes
@@ -414,8 +417,8 @@ def command_6():
         FROM reviewAssignment
         JOIN reviewing ON reviewAssignment.assignmentID = reviewing.assignmentID
         JOIN researchers ON researchers.email = reviewing.email
-        JOIN proposal ON proposal.proposalID = reviewAssignment.proposalID ON proposal.proposalID = reviewing.proposalID
-        JOIN competition ON competition.competitionID = proposal.competitionID ON competition.competitionID = reviewAssignment.competitionID
+        JOIN proposal ON proposal.proposalID = reviewAssignment.proposalID 
+        JOIN competition ON competition.competitionID = proposal.competitionID 
         WHERE firstName = ? AND lastName = ? AND submissionStatus = "Not Submitted" AND competitionStatus = "Open"  
         """
     
