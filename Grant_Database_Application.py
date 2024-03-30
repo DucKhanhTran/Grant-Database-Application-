@@ -91,7 +91,7 @@ def command_1():
     sql_query = """
         SELECT DISTINCT competition.competitionID, competition.title
         FROM competition
-        JOIN proposal 
+        JOIN proposal on competition.competitionID = proposal.competitionID
         WHERE (requestedAmount > 20000 OR (
             SELECT COUNT(email)
             FROM researching
@@ -151,7 +151,7 @@ def command_3():
     sql_query = """
         SELECT proposalID, awardAmount
         FROM proposal
-        JOIN competition
+        JOIN competition ON competition.competitionID = proposal.competitionID
         WHERE strftime('%Y-%m-%d' ,submissionDate) < strftime('%Y-%m-%d', ?)
         ORDER BY awardAmount DESC
         LIMIT 1
@@ -175,9 +175,20 @@ def command_4():
     # Get user input
     area = input("Enter the area: ")
     
+    # Check if there is any competition in the area
+    sql_query = """
+                    SELECT competitionID
+                    FROM competition
+                    WHERE area COLLATE NOCASE = ?
+                    """
+    cursor.execute(sql_query, (area,))
+    results = cursor.fetchall()
+    if len(results) == 0:
+        print("No competition found in the area.\n")
+        return
     # Define the query
     sql_query = """
-        SELECT AVG(ABS(proposal.requestedAmount-awardAmount))
+        SELECT AVG(ABS(proposal.requestedAmount-proposal.awardAmount))
         FROM proposal
         WHERE competitionID IN (SELECT competitionID FROM competition WHERE area COLLATE NOCASE = ?)
         """
@@ -189,12 +200,14 @@ def command_4():
     results = cursor.fetchall()
     
     # Exception handling
-    if len(results) == 0:
-        print("No results found.")
-    
-    # Print the results
-    for row in results:
-        print(f"Average Requested/Awarded Discrepancy: {row[0]}")
+    if results[0][0] == None:
+        print("There is no awarded proposal for this area yet.")
+        return
+    else: 
+        # Print the results
+        for row in results:
+            print(f"Average Requested/Awarded Discrepancy: {row[0]}")
+        return
         
 def command_5():
     # Declare global variables
@@ -255,7 +268,7 @@ def check_conflict(proposalID):
     sql_query = """
                     SELECT firstName, lastName, researchers.email
                     FROM conflictsOfInterest
-                    JOIN researchers 
+                    JOIN researchers ON researchers.email = conflictsOfInterest.email
                     WHERE proposalID = ?
                 """
     
@@ -359,7 +372,7 @@ def add_reviewer(proposalID):
         sql_query = """
             SELECT *
             FROM reviewing
-            JOIN proposal
+            JOIN proposal ON proposal.proposalID = reviewing.proposalID
             WHERE email = ? AND proposalID = ?
             """
         cursor.execute(sql_query, (each_email, proposalID))
@@ -368,7 +381,7 @@ def add_reviewer(proposalID):
             continue
     
         # Add the reviewer to the assginment
-        assignmentID_list = cursor.execute("SELECT reviewAssignment.assignmentID FROM reviewing JOIN reviewAssignment WHERE proposalID = ?", (proposalID,)).fetchall()[0]
+        assignmentID_list = cursor.execute("SELECT reviewAssignment.assignmentID FROM reviewing JOIN reviewAssignment ON reviewAssignment.assignmentID = reviewing.assignmentID WHERE proposalID = ?", (proposalID,)).fetchall()[0]
         
         for each_assignmentID in assignmentID_list:
             sql_query = """
@@ -399,10 +412,10 @@ def command_6():
     sql_query = """
         SELECT title, reviewAssignment.proposalID, assignmentDeadline
         FROM reviewAssignment
-        JOIN reviewing
-        JOIN researchers
-        JOIN proposal ON proposal.proposalID = reviewAssignment.proposalID
-        JOIN competition ON competition.competitionID = proposal.competitionID
+        JOIN reviewing ON reviewAssignment.assignmentID = reviewing.assignmentID
+        JOIN researchers ON researchers.email = reviewing.email
+        JOIN proposal ON proposal.proposalID = reviewAssignment.proposalID ON proposal.proposalID = reviewing.proposalID
+        JOIN competition ON competition.competitionID = proposal.competitionID ON competition.competitionID = reviewAssignment.competitionID
         WHERE firstName = ? AND lastName = ? AND submissionStatus = "Not Submitted" AND competitionStatus = "Open"  
         """
     
